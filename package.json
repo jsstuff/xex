@@ -1,0 +1,39 @@
+{
+  "name": "xex",
+  "version": "0.0.1",
+  "license": "Unlicense",
+
+  "description": "Lightweight and extensible math-like expression parser and compiler.",
+  "keywords": [
+    "compile",
+    "compiler",
+    "expression",
+    "evaluate",
+    "evaluator",
+    "math",
+    "parser"
+  ],
+
+  "homepage": "https://github.com/exjs/xex",
+  "bugs": {
+    "url": "https://github.com/exjs/xex/issues"
+  },
+
+  "contributors": [
+    "Petr Kobalicek <kobalicek.petr@gmail.com> (kobalicek.com)"
+  ],
+
+  "main": "xex.js",
+
+  "engines": { "node": ">=4" },
+  "devDependencies": { "mocha": "*" },
+
+  "repository" : {
+    "type": "git",
+    "url": "https://github.com/exjs/xex.git"
+  },
+
+  "scripts": {
+    "test": "mocha xex-spec.js"
+  }
+}
