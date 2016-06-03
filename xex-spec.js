@@ -354,4 +354,9 @@ describe("xex", function() {
     assert.strictEqual(isNotTaken, true);
     reset();
   });
+
+  it("should handle -0 correctly", function() {
+    assert.strictEqual(Object.is(xex.exp("-0"  ).eval(), -0), true);
+    assert.strictEqual(Object.is(xex.exp("-(0)").eval(), -0), true);
+  });
 });

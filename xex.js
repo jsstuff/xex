@@ -14,7 +14,7 @@ const NoObject = freeze(Object.create(null));
  *
  * @alias xex.VERSION
  */
-const VERSION = "0.0.5";
+const VERSION = "0.0.6";
 
 // ----------------------------------------------------------------------------
 // [ExpressionError]
@@ -49,6 +49,10 @@ const LanguageFeatures = freeze({
   "ternary-else": true
 });
 
+function isNode(node) { return node !== null && typeof node === "object"; }
+function isBinary(node) { return node !== null && node.type === "Binary"; }
+function isNumber(node) { return typeof node === "number"; }
+
 function newVar(name) {
   return { type: "Var", name: name };
 }
@@ -61,10 +65,6 @@ function newBinary(name, info, left, right) {
 function newCall(name, info, args) {
   return { type: "Call", name: name, info: info, args: args };
 }
-
-function isNode(node) { return node !== null && typeof node === "object"; }
-function isValue(node) { return typeof node === "number"; }
-function isBinary(node) { return node !== null && node.type === "Binary"; }
 
 function cloneNode(node) {
   if (!isNode(node)) return node;
@@ -87,7 +87,11 @@ function mustEnclose(node) {
   return type === "Operator" && type.lang !== "ternary-else";
 }
 
-function accessProp(name) {
+function numberToString(x) {
+  return Object.is(x, -0) ? "-0" : String(x);
+}
+
+function propertyAccess(name) {
   return /^[A-Za-z_\$][\w\$]*$/.test(name) ? `.${name}` : `[${JSON.stringify(name)}]`;
 }
 
@@ -208,7 +212,7 @@ class Expression {
       }
       case "Unary": {
         const child = node.value = this.$onNodeFold(node.value, cmap);
-        if (info.safe && isValue(child)) {
+        if (info.safe && isNumber(child)) {
           this.dirty = true;
           return info.eval(child);
         }
@@ -220,7 +224,7 @@ class Expression {
         const feature = info.lang;
 
         if (feature === null) {
-          if (info.safe && isValue(left) && isValue(right)) {
+          if (info.safe && isNumber(left) && isNumber(right)) {
             this.dirty = true;
             return info.eval(left, right);
           }
@@ -233,7 +237,7 @@ class Expression {
           if (!isBinary(right) || right.info.lang !== "ternary-else")
             throwExpressionError(`Invalid AST - Ternary if '${info.name}' requires ternary-else on right side`);
 
-          if (isValue(left))
+          if (isNumber(left))
             return left ? right.left : right.right;
         }
 
@@ -244,7 +248,7 @@ class Expression {
         for (var i = 0; i < args.length; i++)
           args[i] = this.$onNodeFold(args[i], cmap);
 
-        if (info.safe && args.every(isValue)) {
+        if (info.safe && args.every(isNumber)) {
           this.dirty = true;
           return info.eval.apply(info, args);
         }
@@ -266,7 +270,8 @@ class Expression {
     const signature = varr ? varr.join(", ") : vmap;
     const body = this.$onNodeCompile(node, vmap);
 
-    decl.push(`return function(${signature}) {\n` +
+    decl.push(`"use strict"\n` +
+              `return function(${signature}) {\n` +
               `  return ${body};\n` +
               `}\n`);
     try {
@@ -278,15 +283,15 @@ class Expression {
   }
 
   $onNodeCompile(node, vmap) {
-    if (isValue(node))
-      return String(node);
+    if (isNumber(node))
+      return numberToString(node);
 
     const info = node.info;
     switch (node.type) {
       case "Var": {
         const name = node.name;
         if (typeof vmap === "string")
-          return vmap + accessProp(name);
+          return vmap + propertyAccess(name);
 
         if (!hasOwn.call(vmap, name))
           throwExpressionError(`Variable '${name}' used, but no mapping provided`);
@@ -529,21 +534,21 @@ class Parser {
 
           if (this.peek().data === "(") {
             if (!info)
-              throwExpressionError(`Function ${name} not defined`, token.position);
+              throwExpressionError(`Function '${name}' not defined`, token.position);
             if (info.type !== "Function")
-              throwExpressionError(`Variable ${name} cannot be used as function`, token.position);
+              throwExpressionError(`Variable '${name}' cannot be used as function`, token.position);
             value = this.parseCall(token, info);
           }
           else {
             if (info && info.type === "Function")
-              throwExpressionError(`Function ${name} cannot be used as variable`, token.position);
+              throwExpressionError(`Function '${name}' cannot be used as variable`, token.position);
 
             if (info && info.type === "Constant") {
               value = info.value;
             }
             else {
               if (whitelist && !hasOwn.call(whitelist, name))
-                throwExpressionError(`Variable ${name} is not on the whitelist`, token.position);
+                throwExpressionError(`Variable '${name}' is not defined`, token.position);
               value = this.vars[name] || (this.vars[name] = newVar(name));
             }
           }
@@ -811,7 +816,7 @@ class Environment {
       safe: def.safe !== false,
       lang: def.lang || null,
       eval: def.eval || null,
-      emit: def.emit || `$${accessProp(def.name)}(@1)`
+      emit: def.emit || `$${propertyAccess(def.name)}(@1)`
     });
   }
 
@@ -826,7 +831,7 @@ class Environment {
       safe: def.safe !== false,
       lang: def.lang || null,
       eval: def.eval || null,
-      emit: def.emit || `$${accessProp(def.name)}(@1, @2)`
+      emit: def.emit || `$${propertyAccess(def.name)}(@1, @2)`
     });
   }
 
@@ -841,7 +846,7 @@ class Environment {
       safe: def.safe !== false,
       lang: def.lang || null,
       eval: def.eval || null,
-      emit: def.emit || `$${accessProp(def.name)}(@args)`
+      emit: def.emit || `$${propertyAccess(def.name)}(@args)`
     });
   }
 
@@ -863,7 +868,6 @@ function isinf(x) { return +(x === Infinity || x === -Infinity); }
 function isfinite(x) { return +Number.isFinite(x); }
 function isint(x) { return +Number.isInteger(x); }
 function issafeint(x) { return +Number.isSafeInteger(x); }
-function bineq(x, y) { return +(x === y || (Number.isNaN(x) && Number.isNaN(y))); }
 function clamp(x, a, b) { return x < a ? a : x > b ? b : x; }
 function isbetween(x, a, b) { return +(x >= a && x <= b); }
 
@@ -899,11 +903,11 @@ return new Environment()
   .addBinary  ({ name: "||"       , prec:14, rtl : 0, safe: true, eval: function(x,y) { return +(x ||  y); }, emit: "+(@1 || @2)"  })
   .addBinary  ({ name: "=="       , prec: 9, rtl : 0, safe: true, eval: function(x,y) { return +(x === y); }, emit: "+(@1 === @2)" })
   .addBinary  ({ name: "!="       , prec: 9, rtl : 0, safe: true, eval: function(x,y) { return +(x !== y); }, emit: "+(@1 !== @2)" })
-  .addBinary  ({ name: "~="       , prec: 9, rtl : 0, safe: true, eval: bineq })
   .addBinary  ({ name: "<"        , prec: 8, rtl : 0, safe: true, eval: function(x,y) { return +(x <   y); }, emit: "+(@1 < @2)"   })
   .addBinary  ({ name: "<="       , prec: 8, rtl : 0, safe: true, eval: function(x,y) { return +(x <=  y); }, emit: "+(@1 <= @2)"  })
   .addBinary  ({ name: ">"        , prec: 8, rtl : 0, safe: true, eval: function(x,y) { return +(x >   y); }, emit: "+(@1 > @2)"   })
   .addBinary  ({ name: ">="       , prec: 8, rtl : 0, safe: true, eval: function(x,y) { return +(x >=  y); }, emit: "+(@1 >= @2)"  })
+  .addBinary  ({ name: "~="       , prec: 9, rtl : 0, safe: true, eval: function(x,y) { return +Object.is(x, y); }, emit: "+Object.is(@1, @2)" })
   .addBinary  ({ name: "?"        , prec:20, rtl : 0, safe: true, lang: "ternary-if"  , emit: "@1 ? @2" })
   .addBinary  ({ name: ":"        , prec:20, rtl : 0, safe: true, lang: "ternary-else", emit: "@1 : @2" })
   .addFunction({ name: "isinf"    , args: 1, amax: 1, safe: true, eval: isinf })
