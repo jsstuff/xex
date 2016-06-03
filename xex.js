@@ -14,7 +14,7 @@ const NoObject = freeze(Object.create(null));
  *
  * @alias xex.VERSION
  */
-const VERSION = "0.0.3";
+const VERSION = "0.0.4";
 
 // ----------------------------------------------------------------------------
 // [ExpressionError]
@@ -44,6 +44,11 @@ function throwExpressionError(message, position) {
 // [Expression & Utilities]
 // ----------------------------------------------------------------------------
 
+const LanguageFeatures = freeze({
+  "ternary-if"  : true,
+  "ternary-else": true
+});
+
 function newVar(name) {
   return { type: "Var", name: name };
 }
@@ -56,13 +61,13 @@ function newBinary(name, info, left, right) {
 function newCall(name, info, args) {
   return { type: "Call", name: name, info: info, args: args };
 }
-function isValue(node) {
-  return typeof node === "number";
-}
-function cloneNode(node) {
-  if (node === null || typeof node !== "object")
-    return node;
 
+function isNode(node) { return node !== null && typeof node === "object"; }
+function isValue(node) { return typeof node === "number"; }
+function isBinary(node) { return node !== null && node.type === "Binary"; }
+
+function cloneNode(node) {
+  if (!isNode(node)) return node;
   switch (node.type) {
     case "Var"   : return node; // Variable nodes are immutable.
     case "Unary" : return newUnary(node.name, node.info, cloneNode(node.value));
@@ -73,6 +78,15 @@ function cloneNode(node) {
       throwExpressionError(`Node '${node.type}' not recognized`);
   }
 }
+
+function mustEnclose(node) {
+  if (typeof node !== "object")
+    return false;
+
+  const type = node.type;
+  return type === "Operator" && type.lang !== "ternary-else";
+}
+
 function accessProp(name) {
   return /^[A-Za-z_\$][\w\$]*$/.test(name) ? `.${name}` : `[${JSON.stringify(name)}]`;
 }
@@ -203,11 +217,26 @@ class Expression {
       case "Binary": {
         const left = node.left = this.$onNodeFold(node.left, cmap);
         const right = node.right = this.$onNodeFold(node.right, cmap);
+        const feature = info.lang;
 
-        if (info.safe && isValue(left) && isValue(right)) {
-          this.dirty = true;
-          return info.eval(left, right);
+        if (feature === null) {
+          if (info.safe && isValue(left) && isValue(right)) {
+            this.dirty = true;
+            return info.eval(left, right);
+          }
+
+          return node;
         }
+
+        if (feature === "ternary-if") {
+          // The "ternary-if" operator must have "ternary-else" on right side.
+          if (!isBinary(right) || right.info.lang !== "ternary-else")
+            throwExpressionError(`Invalid AST - Ternary if '${info.name}' requires ternary-else on right side`);
+
+          if (isValue(left))
+            return left ? right.left : right.right;
+        }
+
         return node;
       }
       case "Call": {
@@ -265,17 +294,21 @@ class Expression {
       }
       case "Unary": {
         return info.emit.replace(/@1/g, () => {
-          return this.$onNodeCompile(node.value, vmap);
+          const child = node.value;
+          const code = this.$onNodeCompile(child, vmap);
+          return mustEnclose(child) ? `(${code})` : code;
         });
       }
       case "Binary": {
         return info.emit.replace(/@[1-2]/g, (p) => {
-          return this.$onNodeCompile(p === "@1" ? node.left : node.right, vmap);
+          const child = p === "@1" ? node.left : node.right;
+          const code = this.$onNodeCompile(child, vmap);
+          return mustEnclose(child) ? `(${code})` : code;
         });
       }
       case "Call": {
-        const args = node.args;
         return info.emit.replace(/(?:@args|@[1-2])/g, (p) => {
+          const args = node.args;
           if (p !== "@args")
             return this.$onNodeCompile(args[parseInt(p.substr(1), 10)], vmap);
 
@@ -455,81 +488,94 @@ class Parser {
     var info = null;
 
     for (;;) {
-      var token = this.next();
-      var unaryFirst = null;
-      var unaryLast = null;
+      // The only case of value not being `null` is after ternary-if. In that
+      // case the value was already parsed so we want to skip this section.
+      // In C/C++ I would have used the evil goto, here I did it this way.
+      if (value === null) {
+        var token = this.next();
+        var unaryFirst = null;
+        var unaryLast = null;
 
-      // Parse a possible unary operator(s).
-      value = null;
-      if (token.type === kTokenPunct) {
-        do {
-          const name = "unary" + token.data;
-          if (!(info = env.get(name))) break;
+        // Parse a possible unary operator(s).
+        value = null;
+        if (token.type === kTokenPunct) {
+          do {
+            const name = "unary" + token.data;
+            if (!(info = env.get(name))) break;
 
-          const node = newUnary(name, info, value);
-          if (unaryLast)
-            unaryLast.value = node;
-          else
-            unaryFirst = node;
+            const node = newUnary(name, info, value);
+            if (unaryLast)
+              unaryLast.value = node;
+            else
+              unaryFirst = node;
 
-          unaryLast = node;
-          token = this.next();
-        } while (token.type === kTokenPunct);
-      }
-
-      // Parse a value, variable, function call, or nested expression.
-      if (token.type === kTokenValue) {
-        value = token.value;
-      }
-      else if (token.type === kTokenIdent) {
-        const name = token.data;
-        info = env.get(name);
-
-        if (this.peek().data === "(") {
-          if (!info)
-            throwExpressionError(`Function ${name} not defined`, token.position);
-          if (info.type !== "Function")
-            throwExpressionError(`Variable ${name} cannot be used as function`, token.position);
-          value = this.parseCall(token, info);
+            unaryLast = node;
+            token = this.next();
+          } while (token.type === kTokenPunct);
         }
-        else {
-          if (info && info.type === "Function")
-            throwExpressionError(`Function ${name} cannot be used as variable`, token.position);
 
-          if (info && info.type === "Constant") {
-            value = info.value;
+        // Parse a value, variable, function call, or nested expression.
+        if (token.type === kTokenValue) {
+          value = token.value;
+        }
+        else if (token.type === kTokenIdent) {
+          const name = token.data;
+          info = env.get(name);
+
+          if (this.peek().data === "(") {
+            if (!info)
+              throwExpressionError(`Function ${name} not defined`, token.position);
+            if (info.type !== "Function")
+              throwExpressionError(`Variable ${name} cannot be used as function`, token.position);
+            value = this.parseCall(token, info);
           }
           else {
-            if (whitelist && !hasOwn.call(whitelist, name))
-              throwExpressionError(`Variable ${name} is not on the whitelist`, token.position);
-            value = this.vars[name] || (this.vars[name] = newVar(name));
+            if (info && info.type === "Function")
+              throwExpressionError(`Function ${name} cannot be used as variable`, token.position);
+
+            if (info && info.type === "Constant") {
+              value = info.value;
+            }
+            else {
+              if (whitelist && !hasOwn.call(whitelist, name))
+                throwExpressionError(`Variable ${name} is not on the whitelist`, token.position);
+              value = this.vars[name] || (this.vars[name] = newVar(name));
+            }
           }
         }
-      }
-      else if (token.data === "(") {
-        value = this.parseExpression();
-        token = this.next();
+        else if (token.data === "(") {
+          value = this.parseExpression();
+          token = this.next();
 
-        if (token.data !== ")")
+          if (token.data !== ")")
+            throwTokenError(token);
+        }
+        else {
           throwTokenError(token);
-      }
-      else {
-        throwTokenError(token);
-      }
+        }
 
-      // Replace the value with the top-level unary operator, if parsed.
-      if (unaryFirst) {
-        unaryLast.value = value;
-        value = unaryFirst;
+        // Replace the value with the top-level unary operator, if parsed.
+        if (unaryFirst) {
+          unaryLast.value = value;
+          value = unaryFirst;
+        }
       }
 
       // Parse a possible binary operator - the loop must repeat if present.
       token = this.peek();
       if (token.type === kTokenPunct && (info = env.get(token.data))) {
+        const langConstruct = info.lang;
+
         const name = token.data;
         const bNode = newBinary(name, info, null, null);
 
+        // Handle "ternary-else" construct - it must return now as the
+        // token is checked by the caller of `parseExpression()`.
+        if (langConstruct === "ternary-else") break;
+
+        // Consume the token.
         this.skip();
+
         if (!stack.length) {
           bNode.left = value;
           stack.push(bNode);
@@ -566,20 +612,37 @@ class Parser {
             }
           }
         }
+
+        // Parse "<cond> {ternary-if} <taken> {ternary-else} <not-taken>".
+        if (langConstruct === "ternary-if") {
+          const ternLeft = this.parseExpression();
+          const ternTok = this.next();
+
+          if (ternTok.type !== kTokenPunct || (info = env.get(ternTok.data)) == null || info.lang !== "ternary-else")
+            throwExpressionError(`Unterminated ternary-if '${token.data}'`, token.position);
+
+          const ternRight = this.parseExpression();
+          value = newBinary(info.name, info, ternLeft, ternRight);
+        }
+        else {
+          value = null;
+        }
+
+        continue;
       }
-      else {
-        break;
-      }
+
+      break;
     }
 
     if (value === null)
       throwExpressionError("Invalid state");
 
-    if (stack.length === 0)
-      return value;
+    if (stack.length !== 0) {
+      stack[stack.length - 1].right = value;
+      value = stack[0];
+    }
 
-    stack[stack.length - 1].right = value;
-    return stack[0];
+    return value;
   }
 
   parseCall(func, info) {
@@ -683,6 +746,7 @@ class Environment {
 
     const type = def.type;
     const name = def.name;
+    const lang = def.lang;
 
     if (typeof name !== "string")
       throwExpressionError(`Identifier name be string, not '${typeof name}'`);
@@ -696,14 +760,20 @@ class Environment {
           throwExpressionError(`Constant '${name}' must be a number, not '${typeof value}'`);
         break;
       case "Operator":
-        if (typeof def.prec !== "number"  ) throwExpressionError(`${type} '${name}' must provide 'prec' property`);
-        if (typeof def.rtl  !== "boolean" ) throwExpressionError(`${type} '${name}' must provide 'rtl'  property`);
+        if (typeof def.prec !== "number") throwExpressionError(`${type} '${name}' must provide 'prec' property`);
+        if (typeof def.rtl  !== "boolean") throwExpressionError(`${type} '${name}' must provide 'rtl'  property`);
         /* [[fallthrough]] */
       case "Function":
-        if (typeof def.args !== "number"  ) throwExpressionError(`${type} '${name}' must provide 'args' property`);
-        if (typeof def.amax !== "number"  ) throwExpressionError(`${type} '${name}' must provide 'amax' property`);
-        if (typeof def.emit !== "string"  ) throwExpressionError(`${type} '${name}' must provide 'emit' property`);
-        if (typeof def.eval !== "function") throwExpressionError(`${type} '${name}' must provide 'eval' property`);
+        if (lang != null && !hasOwn.call(LanguageFeatures, lang))
+          throwExpressionError(`Language feature '${lang}' not recognized`);
+
+        if (typeof def.args !== "number") throwExpressionError(`${type} '${name}' must provide 'args' property`);
+        if (typeof def.amax !== "number") throwExpressionError(`${type} '${name}' must provide 'amax' property`);
+        if (typeof def.emit !== "string") throwExpressionError(`${type} '${name}' must provide 'emit' property`);
+
+        if (typeof def.eval !== "function" && !lang)
+          throwExpressionError(`${type} '${name}' must provide 'eval' property`);
+
         this.func[name] = def.eval;
         break;
       default:
@@ -734,7 +804,8 @@ class Environment {
       prec: def.prec || 0,
       rtl : Boolean(def.rtl),
       safe: def.safe !== false,
-      eval: def.eval,
+      lang: def.lang || null,
+      eval: def.eval || null,
       emit: def.emit || `$${accessProp(def.name)}(@1)`
     });
   }
@@ -748,7 +819,8 @@ class Environment {
       prec: def.prec || 0,
       rtl : Boolean(def.rtl),
       safe: def.safe !== false,
-      eval: def.eval,
+      lang: def.lang || null,
+      eval: def.eval || null,
       emit: def.emit || `$${accessProp(def.name)}(@1, @2)`
     });
   }
@@ -762,7 +834,8 @@ class Environment {
       prec: 0,
       rtl : false,
       safe: def.safe !== false,
-      eval: def.eval,
+      lang: def.lang || null,
+      eval: def.eval || null,
       emit: def.emit || `$${accessProp(def.name)}(@args)`
     });
   }
@@ -779,13 +852,15 @@ class Environment {
 }
 
 // Use "+" to coerce booleans to numbers where required as `xex` works with numbers only.
-function frac(x)      { return x - Math.floor(x); }
-function isnan(x)     { return +Number.isNaN(x); }
-function isinf(x)     { return +(x === Infinity || x === -Infinity); }
-function isfinite(x)  { return +Number.isFinite(x); }
-function isint(x)     { return +Number.isInteger(x); }
+function frac(x) { return x - Math.floor(x); }
+function isnan(x) { return +Number.isNaN(x); }
+function isinf(x) { return +(x === Infinity || x === -Infinity); }
+function isfinite(x) { return +Number.isFinite(x); }
+function isint(x) { return +Number.isInteger(x); }
 function issafeint(x) { return +Number.isSafeInteger(x); }
-function bineq(x, y)  { return +(x === y || (Number.isNaN(x) && Number.isNaN(y))); }
+function bineq(x, y) { return +(x === y || (Number.isNaN(x) && Number.isNaN(y))); }
+function clamp(x, a, b) { return x < a ? a : x > b ? b : x; }
+function isbetween(x, a, b) { return +(x >= a && x <= b); }
 
 function minmaxval(op) {
   return function() {
@@ -820,10 +895,12 @@ return new Environment()
   .addBinary  ({ name: "=="       , prec: 9, rtl : 0, safe: true, eval: function(x,y) { return +(x === y); }, emit: "+(@1 === @2)" })
   .addBinary  ({ name: "!="       , prec: 9, rtl : 0, safe: true, eval: function(x,y) { return +(x !== y); }, emit: "+(@1 !== @2)" })
   .addBinary  ({ name: "~="       , prec: 9, rtl : 0, safe: true, eval: bineq })
-  .addBinary  ({ name: "<"        , prec: 8, rtl : 0, safe: true, eval: function(x,y) { return +(x <   y); }, emit: "+(@1 < @2)"  })
-  .addBinary  ({ name: "<="       , prec: 8, rtl : 0, safe: true, eval: function(x,y) { return +(x <=  y); }, emit: "+(@1 <= @2)" })
-  .addBinary  ({ name: ">"        , prec: 8, rtl : 0, safe: true, eval: function(x,y) { return +(x >   y); }, emit: "+(@1 > @2)"  })
-  .addBinary  ({ name: ">="       , prec: 8, rtl : 0, safe: true, eval: function(x,y) { return +(x >=  y); }, emit: "+(@1 >= @2)" })
+  .addBinary  ({ name: "<"        , prec: 8, rtl : 0, safe: true, eval: function(x,y) { return +(x <   y); }, emit: "+(@1 < @2)"   })
+  .addBinary  ({ name: "<="       , prec: 8, rtl : 0, safe: true, eval: function(x,y) { return +(x <=  y); }, emit: "+(@1 <= @2)"  })
+  .addBinary  ({ name: ">"        , prec: 8, rtl : 0, safe: true, eval: function(x,y) { return +(x >   y); }, emit: "+(@1 > @2)"   })
+  .addBinary  ({ name: ">="       , prec: 8, rtl : 0, safe: true, eval: function(x,y) { return +(x >=  y); }, emit: "+(@1 >= @2)"  })
+  .addBinary  ({ name: "?"        , prec:20, rtl : 0, safe: true, lang: "ternary-if"  , emit: "@1 ? @2" })
+  .addBinary  ({ name: ":"        , prec:20, rtl : 0, safe: true, lang: "ternary-else", emit: "@1 : @2" })
   .addFunction({ name: "isinf"    , args: 1, amax: 1, safe: true, eval: isinf })
   .addFunction({ name: "isint"    , args: 1, amax: 1, safe: true, eval: isint    , emit: "+Number.isInteger(@1)"})
   .addFunction({ name: "issafeint", args: 1, amax: 1, safe: true, eval: issafeint, emit: "+Number.isSafeInteger(@1)"})
@@ -841,8 +918,9 @@ return new Environment()
   .addFunction({ name: "exp"      , args: 1, amax: 1, safe: true, eval: Math.exp    })
   .addFunction({ name: "expm1"    , args: 1, amax: 1, safe: true, eval: Math.expm1  })
   .addFunction({ name: "log"      , args: 1, amax: 1, safe: true, eval: Math.log    })
-  .addFunction({ name: "log2"     , args: 1, amax: 1, safe: true, eval: Math.log2   })
   .addFunction({ name: "log10"    , args: 1, amax: 1, safe: true, eval: Math.log10  })
+  .addFunction({ name: "log1p"    , args: 1, amax: 1, safe: true, eval: Math.log1p  })
+  .addFunction({ name: "log2"     , args: 1, amax: 1, safe: true, eval: Math.log2   })
   .addFunction({ name: "sin"      , args: 1, amax: 1, safe: true, eval: Math.sin    })
   .addFunction({ name: "sinh"     , args: 1, amax: 1, safe: true, eval: Math.sinh   })
   .addFunction({ name: "cos"      , args: 1, amax: 1, safe: true, eval: Math.cos    })
@@ -862,6 +940,8 @@ return new Environment()
   .addFunction({ name: "pow"      , args: 2, amax: 2, safe: true, eval: Math.pow    })
   .addFunction({ name: "atan2"    , args: 2, amax: 2, safe: true, eval: Math.atan2  })
   .addFunction({ name: "hypot"    , args: 2, amax: 2, safe: true, eval: Math.hypot  })
+  .addFunction({ name: "clamp"    , args: 3, amax: 3, safe: true, eval: clamp       })
+  .addFunction({ name: "isbetween", args: 3, amax: 3, safe: true, eval: isbetween   })
   .freeze();
 })();
 

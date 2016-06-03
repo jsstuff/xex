@@ -11,12 +11,13 @@ function getFuncs(nArgs) {
   const lang = xex.lang;
   const result = [];
   for (var k in lang)
-    if (/^[A-Za-z_]\w*$/.test(k) && lang[k].args === nArgs)
+    if (/^[A-Za-z_]\w*$/.test(k) && (nArgs >= lang[k].args && nArgs <= lang[k].amax))
       result.push(k);
   return result;
 }
 const Functions1 = getFuncs(1);
 const Functions2 = getFuncs(2);
+const Functions3 = getFuncs(3);
 
 const Operators = [
   "+", "-", "*", "/", "%", "==", "!=", "<", "<=", ">", ">=", "&&", "||"
@@ -150,6 +151,18 @@ describe("xex", function() {
           passConst(`${fn}(${a}, ${b})`);
           passConst(`${fn}(${a} * ${b}, ${b})`);
           passConst(`${fn}(${a}, ${a} * ${b})`);
+        }
+      }
+    }
+  });
+
+  it("should handle basic functions of three arguments", function() {
+    for (var a of ValuesFull) {
+      for (var b of ValuesFull) {
+        for (var c of ValuesFull) {
+          for (var fn of Functions3) {
+            passConst(`${fn}(${a}, ${b}, ${c})`);
+          }
         }
       }
     }
@@ -304,5 +317,37 @@ describe("xex", function() {
     assert.throws(function() { exp.compile(["x"]);      });
     assert.throws(function() { exp.compile(["y"]);      });
     assert.throws(function() { exp.compile(["x", "z"]); });
+  });
+
+  it("should handle ternary if-else (basic)", function() {
+    passConst("0   ? 2 : 4");
+    passConst("1   ? 2 : 4");
+    passConst("NaN ? 2 : 4");
+  });
+
+  it("should handle ternary if-else (extended)", function() {
+    var isTaken = false;
+    var isNotTaken = false;
+
+    // Ternary if/else must take wither left or right side.
+    function reset() { isTaken = false; isNotTaken = false; }
+    function taken() { isTaken = true; return 1; }
+    function notTaken() { isNotTaken = true; return 0; }
+
+    const env = xex.clone()
+      .addFunction({ name: "a", eval: taken   , args: 0, safe: false })
+      .addFunction({ name: "b", eval: notTaken, args: 0, safe: false });
+
+    const exp = env.exp("x ? a() : b()");
+
+    assert.strictEqual(exp.eval({ x: 1 }), 1);
+    assert.strictEqual(isTaken, true);
+    assert.strictEqual(isNotTaken, false);
+    reset();
+
+    assert.strictEqual(exp.eval({ x: 0 }), 0);
+    assert.strictEqual(isTaken, false);
+    assert.strictEqual(isNotTaken, true);
+    reset();
   });
 });

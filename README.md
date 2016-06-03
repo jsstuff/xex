@@ -92,6 +92,75 @@ const exp = xex.exp("sin(0.6) + cos(0.5) + x", { noFolding: true });
 exp.fold({ x: 1 });
 ```
 
+Built-In Features
+-----------------
+
+  * Unary operators:
+    * Negate `-(x)`
+    * Not `!(x)`
+  * Arithmetic operators:
+    * Assignment `x = y`
+    * Addition `x + y`
+    * Subtraction `x - y`
+    * Multiplication `x * y`
+    * Division `x / y`
+    * Modulo `x % y`
+  * Comparison operators:
+    * Equal `x == y`
+    * Not equal `x != y`
+    * Greater `x > y`
+    * Greater or equal `x >= y`
+    * Lesser `x < y`
+    * Lesser or equal `x <= y`
+  * Language constructs:
+    * Ternary if-else `condition ? taken : not-taken`
+  * Functions:
+    * Check for NaN `isnan(x)`
+    * Check for infinity `isinf(x)`
+    * Check for finite number `isfinite(x)`
+    * Check for integer `isint(x)`
+    * Check for safe integer `issafeint(x)`
+    * Check between  `isbetween(x, min, max)` - returns `0` or `1`.
+    * Sign `sign(x)`
+    * Round to nearest `round(x)`
+    * Truncate `trunc(x)`
+    * Floor `floor(x)`
+    * Ceil `ceil(x)`
+    * Absolute value `abs(x)`
+    * Exponential `exp(x)`
+    * Exponential minus one `expm1(x)` - the same as `exp(x) - 1`, but more precise.
+    * Logarithm `log(x)`
+    * Logarithm plus one `logp1(x)` - the same as `log(x + 1)`, but more precise.
+    * Logarithm of base 2 `log2(x)`
+    * Logarithm of base 10 `log10(x)`
+    * Square root `sqrt(x)`
+    * Cube root `cbrt(x)`
+    * Fraction `frac(x)`
+    * Sine `sin(x)`
+    * Cosine `cos(x)`
+    * Tangent `tan(x)`
+    * Hyperbolic sine `sinh(x)`
+    * Hyperbolic cosine `cosh(x)`
+    * Hyperbolic tangent `tanh(x)`
+    * Arcsine `asin(x)`
+    * Arccosine `acos(x)`
+    * Arctangent `atan(x)`
+    * Arctangent `atan2(x, y)`
+    * Hyperbolic arcsine `asinh(x)`
+    * Hyperbolic arccosine `acosh(x)`
+    * Hyperbolic arctangent `atanh(x)`
+    * Power `pow(x, y)`
+    * Square root of the sum of squares `hypot(x, y)`
+    * Minimum `min(x, y [, ...])` - returns `NaN` if one or more argument is `NaN`
+    * Maximum `max(x, y [, ...])` - returns `NaN` if one or more argument is `NaN`
+    * Minimum value `minval(x, y [, ...])` - skips `NaN` values
+    * Maximum value `maxval(x, y [, ...])` - skips `NaN` values
+    * Clamp `clamp(x, min, max)`
+  * Constants:
+    * Infinity `Infinity`
+    * Not a Number `NaN`
+    * PI `PI = 3.14159265358979323846`
+
 Extending Guide
 ---------------
 
