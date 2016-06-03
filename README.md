@@ -5,7 +5,7 @@ Lightweight and extensible math-like expression parser and compiler.
 
   * [Official Repository (exjs/xex)](https://github.com/exjs/xex)
   * [Official Chat (gitter)](https://gitter.im/exjs/exjs)
-  * [Official Fiddler](http://kobalicek.com/fiddle-xex.html).
+  * [Official Fiddler](http://kobalicek.com/fiddle-xex.html)
   * [Public Domain (https://unlicense.org)](https://unlicense.org)
 
 Introduction

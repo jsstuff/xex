@@ -264,4 +264,23 @@ describe("xex", function() {
     const exp = env.exp("sum(1, 2, 3, 4)");
     assert.strictEqual(exp.root, 10);
   });
+
+  it("should compile a function with a custom signature", function() {
+    const exp = xex.exp("x / y");
+    const fn = exp.compile(["x", "y"]);
+    assert.strictEqual(fn(8, 2), 4);
+
+    // Invalid args.
+    assert.throws(function() { exp.compile({});        });
+    assert.throws(function() { exp.compile("x");       });
+    assert.throws(function() { exp.compile("x", "y");  });
+    assert.throws(function() { exp.compile(null);      });
+    assert.throws(function() { exp.compile(undefined); });
+
+    // `x` or `y` not referenced.
+    assert.throws(function() { exp.compile([]);         });
+    assert.throws(function() { exp.compile(["x"]);      });
+    assert.throws(function() { exp.compile(["y"]);      });
+    assert.throws(function() { exp.compile(["x", "z"]); });
+  });
 });

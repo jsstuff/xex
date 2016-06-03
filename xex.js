@@ -6,6 +6,7 @@ $export[$as] = (function() {
 
 const hasOwn = Object.prototype.hasOwnProperty;
 const freeze = Object.freeze;
+const isArray = Array.isArray;
 const NoObject = freeze(Object.create(null));
 
 /**
@@ -100,9 +101,35 @@ class Expression {
     return this;
   }
 
+  compile(args) {
+    // Build `varr` and `vmap` based on the input arguments.
+    if (!isArray(args))
+      throwExpressionError(`Argument 'args' must be an array, not '${typeof args}'`);
+
+    const varr = [];
+    const vmap = Object.create(null);
+
+    for (var i = 0; i < args.length; i++) {
+      const name = args[i];
+      if (hasOwn.call(vmap, name))
+        throwExpressionError(`Variable '${name}' provided multiple times`);
+
+      const ident = "_" + String(i + 1);
+      varr.push(ident);
+      vmap[name] = ident;
+    }
+
+    // Verify that all variables the expression uses were provided in `args`.
+    for (var k in this.vars)
+      if (!hasOwn.call(vmap, k))
+        throwExpressionError(`Variable '${k}' not provided`);
+
+    return this.$onFuncCompile(this.root, vmap, varr);
+  }
+
   get eval() {
     if (this.$eval === null)
-      this.$eval = this.$onFuncCompile(this.root);
+      this.$eval = this.$onFuncCompile(this.root, null, null);
     return this.$eval;
   }
 
@@ -142,54 +169,6 @@ class Expression {
         for (var i = 0; i < args.length; i++)
           this.$onNodeInfo(args[i]);
         break;
-      default:
-        throwExpressionError(`Node '${node.type}' not recognized`);
-    }
-  }
-
-  $onFuncCompile(node) {
-    const decl = [];
-    const args = [];
-
-    decl.push("$");
-    args.push(this.env.func);
-
-    const body = this.$onNodeCompile(node);
-    decl.push(`return function(v) {\n` +
-              `  return ${body};\n` +
-              `}\n`);
-    try {
-      return Function.apply(null, decl).apply(null, args);
-    }
-    catch (ex) {
-      throw new ExpressionError(`${ex.message}: ${body}`);
-    }
-  }
-
-  $onNodeCompile(node) {
-    if (isValue(node))
-      return String(node);
-
-    const info = node.info;
-    switch (node.type) {
-      case "Var":
-        return "v." + node.name;
-      case "Unary":
-        return info.emit.replace(/@1/g, () => {
-          return this.$onNodeCompile(node.value);
-        });
-      case "Binary":
-        return info.emit.replace(/@[1-2]/g, (p) => {
-          return this.$onNodeCompile(p === "@1" ? node.left : node.right);
-        });
-      case "Call":
-        return info.emit.replace(/(?:@args|@[1-2])/g, (p) => {
-          if (p === "@args")
-            return node.args.map(this.$onNodeCompile, this).join(", ");
-          else
-            return this.$onNodeCompile(node.args[parseInt(p.substr(1), 10)]);
-        });
-
       default:
         throwExpressionError(`Node '${node.type}' not recognized`);
     }
@@ -237,6 +216,56 @@ class Expression {
         }
         return node;
       }
+
+      default:
+        throwExpressionError(`Node '${node.type}' not recognized`);
+    }
+  }
+
+  $onFuncCompile(node, vmap, varr) {
+    const decl = [];
+    const args = [];
+
+    decl.push("$");
+    args.push(this.env.func);
+
+    const signature = varr ? varr.join(", ") : "v";
+    const body = this.$onNodeCompile(node, vmap);
+
+    decl.push(`return function(${signature}) {\n` +
+              `  return ${body};\n` +
+              `}\n`);
+    try {
+      return Function.apply(null, decl).apply(null, args);
+    }
+    catch (ex) {
+      throw new ExpressionError(`${ex.message}: ${body}`);
+    }
+  }
+
+  $onNodeCompile(node, vmap) {
+    if (isValue(node))
+      return String(node);
+
+    const info = node.info;
+    switch (node.type) {
+      case "Var":
+        return vmap ? vmap[node.name] : "v." + node.name;
+      case "Unary":
+        return info.emit.replace(/@1/g, () => {
+          return this.$onNodeCompile(node.value, vmap);
+        });
+      case "Binary":
+        return info.emit.replace(/@[1-2]/g, (p) => {
+          return this.$onNodeCompile(p === "@1" ? node.left : node.right, vmap);
+        });
+      case "Call":
+        return info.emit.replace(/(?:@args|@[1-2])/g, (p) => {
+          if (p !== "@args")
+            return this.$onNodeCompile(node.args[parseInt(p.substr(1), 10)], vmap);
+
+          return node.args.map(this.$onNodeCompile, this).join(", ");
+        });
 
       default:
         throwExpressionError(`Node '${node.type}' not recognized`);
@@ -324,8 +353,7 @@ class Parser {
     var c, cat;                       // Current character code and category.
 
     while (i < len) {
-      c = input.charCodeAt(i);
-      cat = Category(c);
+      cat = Category(c = input.charCodeAt(i));
 
       if (cat === kCharSpace) {
         i++;
@@ -368,7 +396,7 @@ class Parser {
         } while (start < i);
       }
       else {
-        throwExpressionError(`Invalid character '0x${c.toString(16)}'`, i);
+        throwExpressionError(`Unrecognized character '0x${c.toString(16)}'`, i);
       }
     }
     return this;
@@ -604,7 +632,7 @@ class Environment {
    */
   exp(input, options) {
     if (typeof input !== "string")
-      throwExpressionError(`Argument 'input' must be string, not '${typeof input}'`);
+      throwExpressionError(`Argument 'input' must be a string, not '${typeof input}'`);
 
     if (options == null) options = NoObject;
     const exp = new Parser(this, options).tokenize(input).parse();
