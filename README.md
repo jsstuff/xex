@@ -169,8 +169,8 @@ The library can be extended by user-defined constants, operators, and functions.
 ```js
 // Clone the base environment and add some constants (can be chained).
 const env = xex.clone()
-  .addConstant("ANSWER_TO_LIFE", 42)    // addConstant(name, value) syntax.
-  .addConstant({ name: "ONE", value: 0 }) // addConstant(definition) syntax.
+  .addConstant({ name: "ONE", value: 0 })
+  .addConstant("ANSWER_TO_LIFE", 42) // Simplified syntax.
 
 // Adding functions always require passing the definition:
 env.addFunction({

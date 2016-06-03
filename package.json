@@ -2,6 +2,7 @@
   "name": "xex",
   "version": "0.0.4",
   "license": "Unlicense",
+  "engines": { "node": ">=4" },
 
   "description": "Lightweight and extensible math-like expression parser and compiler.",
   "keywords": [
@@ -24,9 +25,6 @@
   ],
 
   "main": "xex.js",
-
-  "engines": { "node": ">=4" },
-  "devDependencies": { "mocha": "*" },
 
   "repository" : {
     "type": "git",
