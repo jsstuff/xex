@@ -261,8 +261,30 @@ describe("xex", function() {
       }
     });
 
-    const exp = env.exp("sum(1, 2, 3, 4)");
-    assert.strictEqual(exp.root, 10);
+    assert.strictEqual(env.exp("sum(1, 2, 3, 4)").root, 10);
+  });
+
+  it("should add a new operator (binary)", function() {
+    const env = xex.clone().addBinary({
+      name: "**",
+      prec: 2,
+      rtl : true, // Right associative.
+      safe: true,
+      eval: Math.pow
+    });
+
+    assert.strictEqual(env.exp("2 ** 3").root, 8);
+
+    // Precedence tests.
+    assert.strictEqual(env.exp("2 * 2 ** 3").root, 16);
+    assert.strictEqual(env.exp("2 * (2 ** 3)").root, 16);
+
+    assert.strictEqual(env.exp("2 ** 3 * 2").root, 16);
+    assert.strictEqual(env.exp("(2 ** 3) * 2").root, 16);
+
+    assert.strictEqual(env.exp("2 ** 3 ** 2").root, 512);
+    assert.strictEqual(env.exp("2 ** (3 ** 2)").root, 512);
+    assert.strictEqual(env.exp("(2 ** 3) ** 2").root, 64);
   });
 
   it("should compile a function with a custom signature", function() {

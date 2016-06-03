@@ -123,6 +123,23 @@ const exp = env.exp("sum(ANSWER_TO_LIFE, ONE)")
 console.log(exp.eval());
 ```
 
-The `safe` option is pessimistic by default (false), so it's a good practice to always provide it depending on the function you are adding. If your custom function has side effects or returns a different answer every time it's called (like `Math.random()`) then it must not be considered safe.
+The `safe` option is pessimistic by default (false), so it's a good practice to always provide it depending on the function you are adding. If your custom function has side effects or returns a different answer every time it's called (like `Math.random()`) then it must not be considered safe. Safe functions can be evaluated by constant folding of all their arguments are known (constants or already folded expressions).
 
-TODO: Adding operators documentation.
+Extending operators is similar to extending functions with some minor differences: operators associativity and precedence:
+
+```js
+const env = xex.clone();
+
+// Use addUnary() or addBinary() to add new operators.
+env.addBinary({
+  name: "**",     // Required: Name          - Cannot conflict with identifier characters.
+  prec: 2,        // Required: Precedence    - less means higher precedence.
+  rtl : true,     // Optional: Associativity - Right (true) or left (false, default).
+  safe: true,     // Optional: Evaluation has no side effects (default false).
+  eval: Math.pow
+});
+
+console.log(env.exp("2 ** 3"       ).eval()); // 8
+console.log(env.exp("2 ** 3 ** 2"  ).eval()); // 512
+console.log(env.exp("(2 ** 3) ** 2").eval()); // 64
+```

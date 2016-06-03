@@ -14,7 +14,7 @@ const NoObject = freeze(Object.create(null));
  *
  * @alias xex.VERSION
  */
-const VERSION = "0.0.2";
+const VERSION = "0.0.3";
 
 // ----------------------------------------------------------------------------
 // [ExpressionError]
@@ -861,7 +861,8 @@ return new Environment()
   .addFunction({ name: "maxval"   , args: 2, amax: N, safe: true, eval: minmaxval(Math.max) })
   .addFunction({ name: "pow"      , args: 2, amax: 2, safe: true, eval: Math.pow    })
   .addFunction({ name: "atan2"    , args: 2, amax: 2, safe: true, eval: Math.atan2  })
-  .addFunction({ name: "hypot"    , args: 2, amax: 2, safe: true, eval: Math.hypot  });
+  .addFunction({ name: "hypot"    , args: 2, amax: 2, safe: true, eval: Math.hypot  })
+  .freeze();
 })();
 
 }).apply(this, typeof module === "object" ? [module, "exports"] : [this, "xex"]);
