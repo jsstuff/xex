@@ -119,7 +119,7 @@ class Expression {
   }
 
   compile(args) {
-    // Build `varr` and `vmap` based on the input arguments.
+    // Build `varr` and `vmap` based on the source argument.
     if (!isArray(args))
       throwExpressionError(`Argument 'args' must be an array, not '${typeof args}'`);
 
@@ -309,8 +309,12 @@ class Expression {
       case "Call": {
         return info.emit.replace(/(?:@args|@[1-2])/g, (p) => {
           const args = node.args;
-          if (p !== "@args")
-            return this.$onNodeCompile(args[parseInt(p.substr(1), 10)], vmap);
+          if (p !== "@args") {
+            const index = parseInt(p.substr(1), 10) - 1;
+            if (index >= args.length)
+              throwExpressionError(`Invalid index '@${index}' in '${info.emit}'`);
+            return this.$onNodeCompile(args[index], vmap);
+          }
 
           var s = "";
           for (var i = 0; i < args.length; i++) {
@@ -368,7 +372,7 @@ const kMaxOperatorLen = 4;            // Maximum length of a single operator.
 function newToken(type, position, data, value) {
   return {
     type    : type,                   // Token type, see `kToken...`.
-    position: position,               // Token position from the beginning of the input.
+    position: position,               // Token position in expression's source.
     data    : data,                   // Token data (content) as string.
     value   : value                   // Token value (only if the token is a value).
   };
@@ -396,51 +400,51 @@ class Parser {
     this.tokens = [];                 // Tokens array.
   }
 
-  tokenize(input) {
+  tokenize(source) {
     const tokens = this.tokens;       // Tokens array.
     const env = this.env;             // Expression environment.
-    const len = input.length;         // Input length.
+    const len = source.length;        // Source length.
 
-    var i = 0, j = 0;                 // Current index in `input` and a helper variable.
+    var i = 0, j = 0;                 // Current index in `source` and temporary.
     var start = 0;                    // Current token start position.
     var data = "";                    // Current token data (content) as string.
     var c, cat;                       // Current character code and category.
 
     while (i < len) {
-      cat = Category(c = input.charCodeAt(i));
+      cat = Category(c = source.charCodeAt(i));
 
       if (cat === kCharSpace) {
         i++;
       }
       else if (cat === kCharDigit) {
         const n = tokens.length - 1;
-        if (n >= 0 && tokens[n].data === "." && input[i - 1] === ".") {
+        if (n >= 0 && tokens[n].data === "." && source[i - 1] === ".") {
           tokens.length = n;
           i--;
         }
         reValue.lastIndex = i;
-        data = reValue.exec(input)[0];
+        data = reValue.exec(source)[0];
 
         tokens.push(newToken(kTokenValue, i, data, parseFloat(data)));
         i += data.length;
       }
       else if (cat === kCharAlpha) {
         start = i;
-        while (++i < len && ((cat = Category(input.charCodeAt(i))) === kCharAlpha || cat === kCharDigit))
+        while (++i < len && ((cat = Category(source.charCodeAt(i))) === kCharAlpha || cat === kCharDigit))
           continue;
 
-        data = input.substring(start, i);
+        data = source.substring(start, i);
         tokens.push(newToken(kTokenIdent, start, data, null));
       }
       else if (cat === kCharPunct) {
         start = i;
-        while (++i < len && Category(input.charCodeAt(i)) === kCharPunct)
+        while (++i < len && Category(source.charCodeAt(i)) === kCharPunct)
           continue;
 
-        data = input.substring(start, i);
+        data = source.substring(start, i);
         do {
           for (j = Math.min(i - start, kMaxOperatorLen); j > 0; j--) {
-            const part = input.substr(start, j);
+            const part = source.substr(start, j);
             if (env.get(part) || j === 1) {
               tokens.push(newToken(kTokenPunct, start, part, null));
               start += j;
@@ -465,7 +469,8 @@ class Parser {
   parse() {
     // The root expression cannot be empty.
     var token = this.peek();
-    if (token === NoToken) throwTokenError(token);
+    if (token === NoToken)
+      throwExpressionError("Expression cannot be empty", 0);
 
     this.exp = new Expression(this.env, null);
     this.exp.root = this.parseExpression();
@@ -695,7 +700,7 @@ class Environment {
   }
 
   /**
-   * Creates a new `Expression` from `input`.
+   * Creates a new `Expression` from `source`.
    *
    * Options:
    *   - `noFolding` {boolean} If true the `Expression` returned won't be
@@ -704,18 +709,18 @@ class Environment {
    *   - `varsWhitelist` {object} If passed, the parser will recognize only
    *      variables, which are whitelisted (by using `hasOwnProperty` call).
    *
-   * @param {string} input Input string.
+   * @param {string} source Expression source.
    * @param {object} [options]
    *
    * @return {Expression} A new `Expression` instance.
    * @throws {ExpresionError} If tokenizer, parser, or analysis failed.
    */
-  exp(input, options) {
-    if (typeof input !== "string")
-      throwExpressionError(`Argument 'input' must be a string, not '${typeof input}'`);
+  exp(source, options) {
+    if (typeof source !== "string")
+      throwExpressionError(`Argument 'source' must be a string, not '${typeof source}'`);
 
     if (options == null) options = NoObject;
-    const exp = new Parser(this, options).tokenize(input).parse();
+    const exp = new Parser(this, options).tokenize(source).parse();
 
     if (options.noFolding !== true) exp.fold();
     return exp;
@@ -945,4 +950,5 @@ return new Environment()
   .freeze();
 })();
 
-}).apply(this, typeof module === "object" ? [module, "exports"] : [this, "xex"]);
+}).apply(this, typeof module === "object" && module && module.exports
+  ? [module, "exports"] : [this, "xex"]);
