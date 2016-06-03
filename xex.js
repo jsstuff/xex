@@ -14,7 +14,7 @@ const NoObject = freeze(Object.create(null));
  *
  * @alias xex.VERSION
  */
-const VERSION = "0.0.1";
+const VERSION = "0.0.2";
 
 // ----------------------------------------------------------------------------
 // [ExpressionError]
@@ -73,6 +73,9 @@ function cloneNode(node) {
       throwExpressionError(`Node '${node.type}' not recognized`);
   }
 }
+function accessProp(name) {
+  return /^[A-Za-z_\$][\w\$]*$/.test(name) ? `.${name}` : `[${JSON.stringify(name)}]`;
+}
 
 /**
  * Parsed expression.
@@ -119,17 +122,19 @@ class Expression {
       vmap[name] = ident;
     }
 
-    // Verify that all variables the expression uses were provided in `args`.
-    for (var k in this.vars)
-      if (!hasOwn.call(vmap, k))
-        throwExpressionError(`Variable '${k}' not provided`);
-
     return this.$onFuncCompile(this.root, vmap, varr);
+  }
+
+  compileBody(vmap) {
+    if (typeof vmap !== "string" && typeof vmap !== "object")
+      throwExpressionError(`Argument 'vmap' must be a string or object, not '${typeof vmap}'`);
+
+    return this.$onNodeCompile(this.root, vmap);
   }
 
   get eval() {
     if (this.$eval === null)
-      this.$eval = this.$onFuncCompile(this.root, null, null);
+      this.$eval = this.$onFuncCompile(this.root, "v", null);
     return this.$eval;
   }
 
@@ -229,7 +234,7 @@ class Expression {
     decl.push("$");
     args.push(this.env.func);
 
-    const signature = varr ? varr.join(", ") : "v";
+    const signature = varr ? varr.join(", ") : vmap;
     const body = this.$onNodeCompile(node, vmap);
 
     decl.push(`return function(${signature}) {\n` +
@@ -249,23 +254,39 @@ class Expression {
 
     const info = node.info;
     switch (node.type) {
-      case "Var":
-        return vmap ? vmap[node.name] : "v." + node.name;
-      case "Unary":
+      case "Var": {
+        const name = node.name;
+        if (typeof vmap === "string")
+          return vmap + accessProp(name);
+
+        if (!hasOwn.call(vmap, name))
+          throwExpressionError(`Variable '${name}' used, but no mapping provided`);
+        return vmap[node.name];
+      }
+      case "Unary": {
         return info.emit.replace(/@1/g, () => {
           return this.$onNodeCompile(node.value, vmap);
         });
-      case "Binary":
+      }
+      case "Binary": {
         return info.emit.replace(/@[1-2]/g, (p) => {
           return this.$onNodeCompile(p === "@1" ? node.left : node.right, vmap);
         });
-      case "Call":
+      }
+      case "Call": {
+        const args = node.args;
         return info.emit.replace(/(?:@args|@[1-2])/g, (p) => {
           if (p !== "@args")
-            return this.$onNodeCompile(node.args[parseInt(p.substr(1), 10)], vmap);
+            return this.$onNodeCompile(args[parseInt(p.substr(1), 10)], vmap);
 
-          return node.args.map(this.$onNodeCompile, this).join(", ");
+          var s = "";
+          for (var i = 0; i < args.length; i++) {
+            if (s) s += ", ";
+            s += this.$onNodeCompile(args[i], vmap);
+          }
+          return s;
         });
+      }
 
       default:
         throwExpressionError(`Node '${node.type}' not recognized`);
@@ -595,10 +616,6 @@ class Parser {
 // ----------------------------------------------------------------------------
 // [Environment]
 // ----------------------------------------------------------------------------
-
-function accessProp(name) {
-  return /^[A-Za-z_\$][\w\$]*$/.test(name) ? `.${name}` : `[${JSON.stringify(name)}]`;
-}
 
 /**
  * Environment - defines operators, functions, and constants.
