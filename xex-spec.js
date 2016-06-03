@@ -145,6 +145,8 @@ describe("xex", function() {
   });
 
   it("should handle basic functions of two arguments", function() {
+    this.timeout(60000);
+
     for (var a of ValuesFull) {
       for (var b of ValuesFull) {
         for (var fn of Functions2) {
@@ -157,6 +159,8 @@ describe("xex", function() {
   });
 
   it("should handle basic functions of three arguments", function() {
+    this.timeout(60000);
+
     for (var a of ValuesFull) {
       for (var b of ValuesFull) {
         for (var c of ValuesFull) {
