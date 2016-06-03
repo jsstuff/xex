@@ -14,7 +14,7 @@ const NoObject = freeze(Object.create(null));
  *
  * @alias xex.VERSION
  */
-const VERSION = "0.0.4";
+const VERSION = "0.0.5";
 
 // ----------------------------------------------------------------------------
 // [ExpressionError]

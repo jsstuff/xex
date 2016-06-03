@@ -1,6 +1,6 @@
 {
   "name": "xex",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "license": "Unlicense",
   "engines": { "node": ">=4" },
 
