@@ -221,17 +221,30 @@ Built-In Features
     * Check for finite number `isfinite(x)`
     * Check for integer `isint(x)`
     * Check for safe integer `issafeint(x)`
-    * Check between  `isbetween(x, min, max)` - returns `0` or `1`.
+    * Check for binary equality `isequal(x, y)`
+      * `isequal(0, -0)` -> `0`
+      * `isequal(42, 42)` -> `1`
+      * `isequal(NaN, NaN)` -> `1`
+    * Check between  `isbetween(x, min, max)`
+      * returns `0` if `x` is `NaN`
+    * Clamp `clamp(x, min, max)`
+      * returns `NaN` if `x` is `NaN`
     * Sign `sign(x)`
+      * `sign(0)` -> `0`
+      * `sign(-0)` -> `-0`
+      * `sign(NaN)` -> `NaN`
     * Round to nearest `round(x)`
+      * `round(2.5)` -> `3`
     * Truncate `trunc(x)`
     * Floor `floor(x)`
     * Ceil `ceil(x)`
     * Absolute value `abs(x)`
     * Exponential `exp(x)`
-    * Exponential minus one `expm1(x)` - the same as `exp(x) - 1`, but more precise.
+    * Exponential minus one `expm1(x)`
+      * the same as `exp(x) - 1`, but more precise.
     * Logarithm `log(x)`
-    * Logarithm plus one `logp1(x)` - the same as `log(x + 1)`, but more precise.
+    * Logarithm plus one `logp1(x)`
+      * the same as `log(x + 1)`, but more precise.
     * Logarithm of base 2 `log2(x)`
     * Logarithm of base 10 `log10(x)`
     * Square root `sqrt(x)`
@@ -252,11 +265,10 @@ Built-In Features
     * Hyperbolic arctangent `atanh(x)`
     * Power `pow(x, y)`
     * Square root of the sum of squares `hypot(x, y)`
-    * Minimum `min(x, y [, ...])` - returns `NaN` if one or more argument is `NaN`
-    * Maximum `max(x, y [, ...])` - returns `NaN` if one or more argument is `NaN`
-    * Minimum value `minval(x, y [, ...])` - skips `NaN` values
-    * Maximum value `maxval(x, y [, ...])` - skips `NaN` values
-    * Clamp `clamp(x, min, max)`
+    * Min/max `min(x, y...)` and `max(x, y...)`
+      * returns `NaN` if one or more argument is `NaN`
+    * Min/max value `minval(x, y...)` and `maxval(x, y...)`
+      * skips `NaN` values, only returns `NaN` if all values are `NaN`
   * Constants:
     * Infinity `Infinity`
     * Not a Number `NaN`

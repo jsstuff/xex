@@ -128,13 +128,6 @@ describe("xex", function() {
     passConst("!1 + !2 - !3 * !4");
   });
 
-  it("should handle operators (xex-specific)", function() {
-    passVars("0 ~= 1"    , {}, 0);
-    passVars("0 ~= NaN"  , {}, 0);
-    passVars("0 ~= 0"    , {}, 1);
-    passVars("NaN ~= NaN", {}, 1);
-  });
-
   it("should handle basic functions of one argument", function() {
     for (var a of ValuesFull) {
       for (var fn of Functions1) {
@@ -170,6 +163,16 @@ describe("xex", function() {
         }
       }
     }
+  });
+
+  it("should handle basic functions (xex-specific)", function() {
+    passVars("isequal(0, 1)"    , {}, 0);
+    passVars("isequal(0, NaN)"  , {}, 0);
+    passVars("isequal(0, 0)"    , {}, 1);
+    passVars("isequal(0, -0)"   , {}, 0);
+    passVars("isequal(-0, 0)"   , {}, 0);
+    passVars("isequal(-0, -0)"  , {}, 1);
+    passVars("isequal(NaN, NaN)", {}, 1);
   });
 
   it("should handle basic functions in compiled code", function() {

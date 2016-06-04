@@ -14,7 +14,7 @@ const NoObject = freeze(Object.create(null));
  *
  * @alias xex.VERSION
  */
-const VERSION = "0.0.6";
+const VERSION = "0.1.0";
 
 // ----------------------------------------------------------------------------
 // [ExpressionError]
@@ -868,6 +868,7 @@ function isinf(x) { return +(x === Infinity || x === -Infinity); }
 function isfinite(x) { return +Number.isFinite(x); }
 function isint(x) { return +Number.isInteger(x); }
 function issafeint(x) { return +Number.isSafeInteger(x); }
+function isequal(x, y) { return +Object.is(x, y); }
 function clamp(x, a, b) { return x < a ? a : x > b ? b : x; }
 function isbetween(x, a, b) { return +(x >= a && x <= b); }
 
@@ -907,7 +908,6 @@ return new Environment()
   .addBinary  ({ name: "<="       , prec: 8, rtl : 0, safe: true, eval: function(x,y) { return +(x <=  y); }, emit: "+(@1 <= @2)"  })
   .addBinary  ({ name: ">"        , prec: 8, rtl : 0, safe: true, eval: function(x,y) { return +(x >   y); }, emit: "+(@1 > @2)"   })
   .addBinary  ({ name: ">="       , prec: 8, rtl : 0, safe: true, eval: function(x,y) { return +(x >=  y); }, emit: "+(@1 >= @2)"  })
-  .addBinary  ({ name: "~="       , prec: 9, rtl : 0, safe: true, eval: function(x,y) { return +Object.is(x, y); }, emit: "+Object.is(@1, @2)" })
   .addBinary  ({ name: "?"        , prec:20, rtl : 0, safe: true, lang: "ternary-if"  , emit: "@1 ? @2" })
   .addBinary  ({ name: ":"        , prec:20, rtl : 0, safe: true, lang: "ternary-else", emit: "@1 : @2" })
   .addFunction({ name: "isinf"    , args: 1, amax: 1, safe: true, eval: isinf })
@@ -915,6 +915,7 @@ return new Environment()
   .addFunction({ name: "issafeint", args: 1, amax: 1, safe: true, eval: issafeint, emit: "+Number.isSafeInteger(@1)"})
   .addFunction({ name: "isnan"    , args: 1, amax: 1, safe: true, eval: isnan    , emit: "+Number.isNaN(@1)"})
   .addFunction({ name: "isfinite" , args: 1, amax: 1, safe: true, eval: isfinite , emit: "+Number.isFinite(@1)" })
+  .addFunction({ name: "isequal"  , args: 2, amax: 2, safe: true, eval: isequal  , emit: "+Object.is(@1, @2)" })
   .addFunction({ name: "abs"      , args: 1, amax: 1, safe: true, eval: Math.abs    })
   .addFunction({ name: "sign"     , args: 1, amax: 1, safe: true, eval: Math.sign   })
   .addFunction({ name: "round"    , args: 1, amax: 1, safe: true, eval: Math.round  })
