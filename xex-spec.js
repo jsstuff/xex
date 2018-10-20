@@ -1,4 +1,4 @@
-// xex.js <https://github.com/exjs/xex>
+// xex.js <https://github.com/jsstuff/xex>
 "use strict";
 
 const assert = require("assert");

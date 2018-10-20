@@ -1,4 +1,4 @@
-// xex.js <https://github.com/exjs/xex>
+// xex.js <https://github.com/jsstuff/xex>
 (function($export, $as) {
 "use strict";
 

@@ -15,9 +15,9 @@
     "parser"
   ],
 
-  "homepage": "https://github.com/exjs/xex",
+  "homepage": "https://github.com/jsstuff/xex",
   "bugs": {
-    "url": "https://github.com/exjs/xex/issues"
+    "url": "https://github.com/jsstuff/xex/issues"
   },
 
   "contributors": [
@@ -28,7 +28,7 @@
 
   "repository" : {
     "type": "git",
-    "url": "https://github.com/exjs/xex.git"
+    "url": "https://github.com/jsstuff/xex.git"
   },
 
   "scripts": {

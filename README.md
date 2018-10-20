@@ -3,15 +3,14 @@ xex.js
 
 Lightweight and extensible math-like expression parser and compiler.
 
-  * [Official Repository (exjs/xex)](https://github.com/exjs/xex)
-  * [Official Chat (gitter)](https://gitter.im/exjs/exjs)
+  * [Official Repository (jsstuff/xex)](https://github.com/jsstuff/xex)
   * [Official Fiddler](http://kobalicek.com/fiddle-xex.html)
   * [Public Domain (https://unlicense.org)](https://unlicense.org)
 
 Introduction
 ------------
 
-xex.js is a lightweight library that provides API to parse mathematic-like expressions and to compile them into javascript functions of user-provided signatures. The library was designed to be small, hackable, and embeddable in other projects - it has no dependencies and all functionality fits into a single file. It was primarily designed for [xschema](https://github.com/exjs/xschema) library to provide support for expression constraints and access control rules, but since the library has much more use-cases it was separated from the original project.
+xex.js is a lightweight library that provides API to parse mathematic-like expressions and to compile them into javascript functions of user-provided signatures. The library was designed to be small, hackable, and embeddable in other projects - it has no dependencies and all functionality fits into a single file. It was primarily designed for [xschema](https://github.com/jsstuff/xschema) library to provide support for expression constraints and access control rules, but since the library has much more use-cases it was separated from the original project.
 
 The expression is internally represented as AST, unlike many other expression evaluators that use postfix notation. The reason to use AST was to make the library friendly for implementing new features. The library currently provides nearly full access to JS `Math` functionality with some additional features. It treats all variables as numbers and is currently designed to work only with numbers - that's it, no user-defined types, objects, etc...
 
